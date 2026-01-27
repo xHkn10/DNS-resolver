@@ -1,8 +1,9 @@
+#include "types.hpp"
 #include <random>
+#include <span>
 #include <vector>
 #include <iostream>
 #include <iomanip>
-#include "types.hpp"
 
 inline std::ostream& operator<<(std::ostream& os, RCode code) {
     switch (code) {
@@ -69,7 +70,7 @@ namespace util {
         return gen;
     }
 
-    inline std::vector<u8> normalize(const std::vector<u8>& str) {
+    inline std::vector<u8> normalize(std::span<const u8> str) {
         std::vector<u8> res;
         res.reserve(str.size());
         u8 off = 'A' - 'a';

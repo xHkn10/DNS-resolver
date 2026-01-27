@@ -15,6 +15,7 @@ enum class ResolverStatus {
 struct ResolverResult {
     ResolverStatus status;
     RCode code;
+    Message rcvd_msg;
     explicit operator bool() {
         return status == ResolverStatus::Success;
     }
@@ -27,6 +28,7 @@ private:
 public:
     int listen_sock;
     sockaddr_in listen_addr;
+    const int max_iterations = 30;
     Cache cache;
 
 public:
@@ -37,8 +39,11 @@ public:
 
 private:
     ResolverResult
-    resolve(const Message& cli_query, Message& send_to_cli, ClientContext& cli_ctx);
+    resolve(const Question& q);
 
+    ResolverResult
+    resolve(const Question& q, int& n_iterations);
+    
     void
     send_formerr(
         const sockaddr_in& cli_addr,

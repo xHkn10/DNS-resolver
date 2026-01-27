@@ -106,6 +106,5 @@ struct ClientContext {
     bool uses_edns = false;
     bool wants_dnssec = false;
     socklen_t addr_len;
-    int max_iterations = 30;
     sockaddr_in addr;
 };

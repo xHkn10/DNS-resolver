@@ -3,11 +3,14 @@
 #include "types.hpp"
 #include <chrono>
 #include <optional>
+#include <span>
 #include <unordered_map>
 #include <vector>
 
+class Message;
+
 struct CacheEntry {
-    std::vector<ResourceRecord> records;
+    std::vector<ResourceRecord> rrset;
     RCode code;
     std::chrono::steady_clock::time_point expires_at;
 };
@@ -40,10 +43,12 @@ private:
     std::unordered_map<CacheKey, CacheEntry, CacheKeyHash> cache_;
 
 public:
+    Cache();
+
     void
     put_positive(
         const CacheKey& k,
-        const std::vector<ResourceRecord>& rrs
+        const std::vector<ResourceRecord>& rrset
     );
 
     void
@@ -53,6 +58,11 @@ public:
         u32 soa_ttl
     );
 
+    void cache_msg(const Message& m);
+
     std::optional<CacheEntry>
-    get(const std::vector<u8>& name, RRType rrtype, DNSClass rrclass);
+    get(std::span<const u8> name, RRType rrtype, DNSClass rrclass);
+
+    CacheEntry
+    find_best_ns_rrset(const std::vector<u8>& name);
 };

@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+struct CacheEntry;
+
 class Message {
 public:
     Header header;
@@ -17,8 +19,14 @@ public:
 
     std::optional<std::vector<u8>> serialize() const;
     static std::optional<Message> deserialize(const std::vector<u8>& packet);
-    
-    Message from_questions() const;
+        
+    static Message from_question(const Question& q);
+    static Message from_cache_entry(const CacheEntry& entry, const Question& q);
+    static Message from_cache_entry(
+        const std::vector<ResourceRecord>& chain,
+        const CacheEntry& entry,
+        const Question& q
+    );
     
     void put_random_id();
 

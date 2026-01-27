@@ -1,4 +1,5 @@
 #include "Message.hpp"
+#include "Cache.hpp"
 #include "util.hpp"
 #include <cstddef>
 #include <optional>
@@ -138,17 +139,49 @@ Message::has_glue() const {
 }
 
 Message
-Message::from_questions() const {
+Message::from_question(const Question &q) {
     Message res{};
     
-    auto& gen = util::seed();
-    
+    res.questions.push_back(q);
+    res.header.qdcount = 1;
     res.put_edns_opt();
-    res.header.arcount = 1;
+    auto& gen = util::seed();
     res.header.id = std::uniform_int_distribution<u16>{0, 65535}(gen);
     res.header.flags = 0x0000;
-    res.header.qdcount = questions.size();
-    res.questions = std::move(questions);
+    
+    return res;
+}
+
+Message
+Message::from_cache_entry(
+    const CacheEntry& entry,
+    const Question& q
+) {
+    Message res;
+    res.header.flags |= static_cast<u32>(entry.code);
+    res.header.ancount = entry.rrset.size();
+    res.answers = entry.rrset;
+    res.header.qdcount = 1;
+    res.questions.push_back(q);
+    return res;
+}
+
+Message
+Message::from_cache_entry(
+    const std::vector<ResourceRecord>& chain,
+    const CacheEntry& entry,
+    const Question& q
+) {
+    Message res;
+    res.header.flags |= static_cast<u32>(entry.code);
+    
+    res.header.ancount = chain.size() + entry.rrset.size();
+    
+    res.answers = chain;
+    res.answers.insert(res.answers.end(), entry.rrset.begin(), entry.rrset.end());
+
+    res.header.qdcount = 1;
+    res.questions.push_back(q);
     return res;
 }
 

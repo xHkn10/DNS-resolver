@@ -1,7 +1,6 @@
 #include "Message.hpp"
 #include "Resolver.hpp"
 #include "Cache.hpp"
-#include "constants.hpp"
 #include "types.hpp"
 #include "util.hpp"
 
@@ -12,7 +11,6 @@
 #include <optional>
 #include <unistd.h>
 #include <iostream>
-#include <unordered_map>
 #include <vector>
 
 
@@ -79,17 +77,16 @@ Resolver::listen() {
             continue;
         }
 
-        Message send_to_cli_msg;
-        ResolverResult res = resolve(*cli_query, send_to_cli_msg, cli_ctx);
+        ResolverResult res = resolve(cli_query->questions.front());
 
         if (res.status != ResolverStatus::Success) {
             send_servfail(cli_addr, cli_addr_len, packet);
             continue;
         }
         
-        finalize_response(send_to_cli_msg, res, cli_ctx);
+        finalize_response(res.rcvd_msg, res, cli_ctx);
 
-        auto send_to_cli_bytes = send_to_cli_msg.serialize();
+        auto send_to_cli_bytes = res.rcvd_msg.serialize();
 
         if (!send_to_cli_bytes) {
             std::cerr << "Error\n";
@@ -170,54 +167,68 @@ Resolver::send_formerr(
     );
 }
 
-
 ResolverResult
-Resolver::resolve(
-    const Message& cli_query,
-    Message& send_to_cli,
-    ClientContext& cli_ctx
-) {
-    std::vector<ResourceRecord> adds = dns::roots::ALL;
-    std::vector<ResourceRecord> auths;
-    
-    Message msg = cli_query.from_questions();
-    auto bytes = msg.serialize();
+Resolver::resolve(const Question& q) {
+    int it = max_iterations;
+    return resolve(q, it);
+}
 
-    auto entry = cache.get(
-        msg.questions.front().qname,
-        static_cast<RRType>(msg.questions.front().qtype),
-        msg.questions.front().qclass
-    );
-    
-    if (entry) {
-        std::cout << "Cache hit\n";
-        send_to_cli = std::move(msg);
-        send_to_cli.answers = entry->records;
-        send_to_cli.header.ancount = entry->records.size();
-        return {ResolverStatus::Success, entry->code};
-    }
-    
-    std::cout << "Cache miss\n";
-
-    if (!bytes)
-        return {ResolverStatus::InternalError, RCode::ServFail};
-    
-    while (true) {
-        if (--cli_ctx.max_iterations == 0) {
-            send_to_cli.header.flags |= static_cast<u16>(RCode::ServFail);
-            return {ResolverStatus::LoopDetected, RCode::ServFail};
+// dig @localhost www.brother.in -p 3169 
+ResolverResult
+Resolver::resolve(const Question& q, int& n_iterations) {
+    {
+        {
+            auto entry = cache.get(q.qname, static_cast<RRType>(q.qtype), q.qclass);
+            if (entry) {
+                Message ret = Message::from_cache_entry(*entry, q);
+                return {ResolverStatus::Success, entry->code, ret};
+            }
         }
 
-        bool authority_section = false;
-        bool additional_section = false;
+        int limit = 8; // follow cname chain
+        std::vector<u8> cur = q.qname;
+        std::vector<ResourceRecord> chain;
+        while (true) {
+            if (--limit == 0)
+                break;
+            auto cname = cache.get(cur, RRType::CNAME, DNSClass::IN);
+            if (cname && cname->rrset.size() > 0) {
+                chain.push_back(cname->rrset.front());
+                auto entry = cache.get(
+                    cname->rrset.front().rdata,
+                    static_cast<RRType>(q.qtype),
+                    q.qclass
+                );
+                if (entry) {
+                    Message ret = Message::from_cache_entry(chain, *entry, q);
+                    return {ResolverStatus::Success, entry->code, ret};
+                }
+                cur = cname->rrset.front().rdata;
+            } else break;
+        }
+    }
 
-        for (const auto& rr : adds) {
-            if (rr.rrtype != RRType::A)
-                continue;
+    Message query_msg = Message::from_question(q);
+    auto bytes = query_msg.serialize();
+    if (!bytes)
+        return {ResolverStatus::InternalError, RCode::ServFail};
 
+    while (true) {
+        if (--n_iterations == 0)
+            break;
+
+        CacheEntry best_nss = cache.find_best_ns_rrset(q.qname);
+        std::vector<ResourceRecord> a_records;
+        for (const ResourceRecord& ns : best_nss.rrset) {
+            auto entry = cache.get(ns.rdata, RRType::A, DNSClass::IN);
+            if (entry)
+                a_records.insert(a_records.end(), entry->rrset.begin(), entry->rrset.end());
+        }
+
+        for (const ResourceRecord& a_record : a_records) {
             int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
             sockaddr_in send_addr{.sin_family=AF_INET, .sin_port=htons(DNS_PORT)};
-            std::memcpy(&send_addr.sin_addr.s_addr, rr.rdata.data(), 4);
+            std::memcpy(&send_addr.sin_addr.s_addr, a_record.rdata.data(), 4);
 
             if (connect(
                 sockfd,
@@ -230,122 +241,50 @@ Resolver::resolve(
             }
 
             send(sockfd, bytes->data(), bytes->size(), 0);
-
             std::vector<u8> buffer(max_buffer_sz);
-
-            std::cout << "waiting for " << util::dn_to_str(rr.name) << '\n';
-            
-            ssize_t n = recv(sockfd, buffer.data(), max_buffer_sz, 0);
-            close(sockfd);
+            ssize_t n = recv(sockfd, buffer.data(), buffer.size(), 0);
 
             if (n == -1) {
                 perror("recv");
-                std::cerr << util::dn_to_str(rr.name) << " failed\n";
+                close(sockfd);
+                continue;
+            }
+            if (n < Header::HEADER_SZ) {
+                close(sockfd);
                 continue;
             }
 
-            std::cout << "received " << n << " bytes from " << util::dn_to_str(rr.name) << '\n';
-            
-            if (n < Header::HEADER_SZ)
-                continue;
-            
-            buffer.resize(n);
             auto rcvd_msg = Message::deserialize(buffer);
-
-            if (!rcvd_msg || rcvd_msg->header.id != msg.header.id)
-                continue;
-
-            auto cache_section = [&](const std::vector<ResourceRecord>& rrs) {
-                std::unordered_map<CacheKey, std::vector<ResourceRecord>, CacheKeyHash> groups;
-                for (const ResourceRecord& rr : rrs)
-                    groups[{rr.name, rr.rrtype, rr.rrclass}].push_back(rr);
-                for (auto& [key, records] : groups)
-                    cache.put_positive(key, records);
-            };
-
-            // cache_section(rcvd_msg->authorities);
-            // cache_section(rcvd_msg->additional);
-
-            if (rcvd_msg->header.is_authoritative()) {
-                if (rcvd_msg->header.ancount > 0) {
-                    std::cout << "ANSWER FOUND to " << util::dn_to_str(rcvd_msg->questions.front().qname) << '\n' << util::bytes_to_ipv4(rcvd_msg->answers.front().rdata) << '\n';
-
-                    cache_section(rcvd_msg->answers);
-
-                    send_to_cli = std::move(*rcvd_msg);
-                    return {ResolverStatus::Success, RCode::NoError};
-                }
-
-                RCode code = rcvd_msg->header.get_err_code();
-                std::cerr << "Authoritative server sent error code " << code << '\n';
-
-                if (code == RCode::NXDomain || code == RCode::NoError) {
-                    u32 soa_ttl = 300;
-                    for (const ResourceRecord& rr : rcvd_msg->authorities) {
-                        if (rr.rrtype == RRType::SOA) {
-                            u32 soa_min;
-                            std::memcpy(&soa_min, rr.rdata.data() + rr.rdata.size() - 4, 4);
-                            soa_ttl = rr.ttl < soa_ttl ? rr.ttl : soa_ttl;
-                            soa_ttl = soa_min < soa_ttl ? soa_min : soa_ttl;
-                        }
-                    }
-
-                    cache.put_negative({
-                        msg.questions.front().qname,
-                        static_cast<RRType>(msg.questions.front().qtype),
-                        msg.questions.front().qclass
-                    }, code, soa_ttl);
-
-                    send_to_cli = std::move(*rcvd_msg);
-                    return {ResolverStatus::Success, code};
-                }
-
+            if (!rcvd_msg) {
+                close(sockfd);
                 continue;
             }
+            RCode rcvd_msg_code = rcvd_msg->header.get_err_code();
 
-            if (rcvd_msg->header.nscount == 0)
+            if (rcvd_msg->header.id != query_msg.header.id)
                 continue;
-
-            authority_section = true;
-            auths = std::move(rcvd_msg->authorities);
-
-            if (rcvd_msg->has_glue()) {
-                additional_section = true;
-                adds = std::move(rcvd_msg->additional);
-            }
+            if (rcvd_msg_code != RCode::NoError && rcvd_msg_code != RCode::NXDomain)
+                continue;
             
-            break;
-        }
+            cache.cache_msg(*rcvd_msg);
 
-        if (!authority_section)
-            return {ResolverStatus::NoCandidates, RCode::ServFail};
+            if (rcvd_msg->header.is_authoritative())
+                return {ResolverStatus::Success, rcvd_msg_code, *rcvd_msg};
 
-        if (!additional_section) {
-            bool found_ans = false;
-            for (const ResourceRecord& rr : auths) {
-                Message new_task;
-                if (rr.rrtype == RRType::NS)
-                    new_task.questions.emplace_back(rr.rdata, QType::A, DNSClass::IN);
-                else
-                    continue;
-                new_task.header.qdcount = 1;
-                new_task.put_edns_opt();
-                new_task.put_random_id();
-    
-                Message ans;
-                ResolverResult res = resolve(new_task, ans, cli_ctx);
-        
-                if (res) {
-                    adds = std::move(ans.answers);
-                    found_ans = true;
-                    break;
+            if (rcvd_msg->header.arcount <= 1) {
+                for (const ResourceRecord& ns : rcvd_msg->authorities) {
+                    if (ns.rrtype != RRType::NS)
+                        continue;
+                    ResolverResult res = resolve({ns.rdata, QType::A, DNSClass::IN}, n_iterations);
+                    if (res.status == ResolverStatus::Success)
+                        break;
                 }
             }
 
-            if (!found_ans)
-                return {ResolverStatus::NoCandidates, RCode::ServFail};
+            if (rcvd_msg->header.nscount > 0)
+                break;
         }
     }
 
-    return {ResolverStatus::NoCandidates, RCode::ServFail};
+    return {ResolverStatus::LoopDetected, RCode::ServFail};
 }

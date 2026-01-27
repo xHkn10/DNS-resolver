@@ -1,25 +1,39 @@
 #include "Cache.hpp"
+#include "Message.hpp"
 #include "types.hpp"
 #include "util.hpp"
+#include "constants.hpp"
 #include <chrono>
 #include <optional>
+#include <span>
 #include <vector>
+
+Cache::Cache() {
+    for (const ResourceRecord& rr : dns::roots::ALL)
+        put_positive({rr.name, rr.rrtype, rr.rrclass}, {rr});
+
+    std::vector<ResourceRecord> root_ns_rrset;
+    for (const ResourceRecord& rr : dns::roots::ALL)
+        root_ns_rrset.emplace_back(std::vector<u8>{1, '.', 0}, RRType::NS, DNSClass::IN, rr.ttl, rr.name.size(), rr.name);
+
+    put_positive({{1, '.', 0}, RRType::NS, DNSClass::IN}, root_ns_rrset);
+}
 
 void
 Cache::put_positive(
     const CacheKey& k,
-    const std::vector<ResourceRecord>& records
+    const std::vector<ResourceRecord>& rrset
 ) {
     auto now = std::chrono::steady_clock::now();
     
-    u32 min_ttl = 0xFFFFFFFF;
-    for (const ResourceRecord& rr : records)
+    u32 min_ttl = 0xFFFFFFFFU;
+    for (const ResourceRecord& rr : rrset)
         if (rr.ttl < min_ttl)
             min_ttl = rr.ttl;
 
     cache_.insert_or_assign(
         k,
-        CacheEntry{records, RCode::NoError, now + std::chrono::seconds(min_ttl)}
+        CacheEntry{rrset, RCode::NoError, now + std::chrono::seconds(min_ttl)}
     );
 }
 
@@ -33,7 +47,7 @@ Cache::put_negative(const CacheKey& k, RCode code, u32 soa_ttl) {
 }
 
 std::optional<CacheEntry>
-Cache::get(const std::vector<u8>& name, RRType rrtype, DNSClass rrclass) {
+Cache::get(std::span<const u8> name, RRType rrtype, DNSClass rrclass) {
 
     std::vector<u8> norm = util::normalize(name);
     auto it = cache_.find({norm, rrtype, rrclass});
@@ -54,8 +68,57 @@ Cache::get(const std::vector<u8>& name, RRType rrtype, DNSClass rrclass) {
         res.expires_at - now
     ).count();
     
-    for (ResourceRecord& rr : res.records)
+    for (ResourceRecord& rr : res.rrset)
         rr.ttl = rem;
 
     return res;
+}
+
+CacheEntry
+Cache::find_best_ns_rrset(const std::vector<u8>& name) {
+    std::span<const u8> vw = name;
+    size_t start = 0;
+    while (true) {
+        auto entry = get(vw.subspan(start), RRType::NS, DNSClass::IN);
+        if (entry)
+            return *entry;
+        if (start >= name.size() || name[start] == 0)
+            break;
+        start += name[start] + 1;
+    }
+    
+    return *get(std::vector<u8>{1, '.', 0}, RRType::NS, DNSClass::IN);
+}
+
+void
+Cache::cache_msg(const Message& m) {
+
+    std::unordered_map<CacheKey, std::vector<ResourceRecord>, CacheKeyHash> grp;
+    const ResourceRecord* soa = nullptr;
+
+    for (const ResourceRecord& rr : m.authorities)
+        if (rr.rrtype == RRType::NS)
+            grp[{rr.name, RRType::NS, rr.rrclass}].push_back(rr);
+        else if (rr.rrtype == RRType::SOA)
+            soa = &rr;
+    
+    for (const ResourceRecord& rr : m.answers)
+        grp[{rr.name, rr.rrtype, rr.rrclass}].push_back(rr);
+
+    for (const ResourceRecord& rr : m.additional)
+        if (rr.rrtype == RRType::A || rr.rrtype == RRType::AAAA)
+            grp[{rr.name, rr.rrtype, rr.rrclass}].push_back(rr);
+
+    if (soa && m.header.ancount == 0) {
+        u32 soa_minimum;
+        std::memcpy(&soa_minimum, soa->rdata.data() + soa->rdata.size() - 4, 4);
+        put_negative({
+            m.questions.front().qname,
+            static_cast<RRType>(m.questions.front().qtype),
+            m.questions.front().qclass
+        }, m.header.get_err_code(), soa_minimum);
+    }
+
+    for (auto& [k, rrset] : grp)
+        put_positive(k, rrset);
 }
