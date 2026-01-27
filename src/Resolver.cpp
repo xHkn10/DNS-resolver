@@ -84,9 +84,9 @@ Resolver::listen() {
             continue;
         }
         
-        finalize_response(res.rcvd_msg, res, cli_ctx);
+        finalize_response(res, cli_ctx);
 
-        auto send_to_cli_bytes = res.rcvd_msg.serialize();
+        auto send_to_cli_bytes = res.msg.serialize();
 
         if (!send_to_cli_bytes) {
             std::cerr << "Error\n";
@@ -107,29 +107,28 @@ Resolver::listen() {
 
 void
 Resolver::finalize_response(
-    Message& m,
-    ResolverResult res,
+    ResolverResult& res,
     const ClientContext& cli
 ) {
-    m.header.id = cli.id;
-    m.header.set_qr_bit();
-    m.header.set_rd_bit();
-    m.header.set_ra_bit();
-    m.header.clear_aa_bit();
-    m.header.set_errcode(res.code);
+    res.msg.header.id = cli.id;
+    res.msg.header.set_qr_bit();
+    res.msg.header.set_rd_bit();
+    res.msg.header.set_ra_bit();
+    res.msg.header.clear_aa_bit();
+    res.msg.header.set_errcode(res.code);
     if (res.status == ResolverStatus::Success) {
-        if (m.header.ancount > 0)
-            m.strip_sections();
+        if (res.msg.header.ancount > 0)
+            res.msg.strip_sections();
         else {
-            m.additional.clear();
-            m.header.arcount = 0;
+            res.msg.additional.clear();
+            res.msg.header.arcount = 0;
         }
         if (cli.uses_edns)
-            m.put_edns_opt();
+            res.msg.put_edns_opt();
     }
 
-    if (m.size() > cli.max_payload)
-        m.truncate_msg(cli.max_payload);
+    if (res.msg.size() > cli.max_payload)
+        res.msg.truncate_msg(cli.max_payload);
 }
 
 void
@@ -170,7 +169,29 @@ Resolver::send_formerr(
 ResolverResult
 Resolver::resolve(const Question& q) {
     int it = max_iterations;
-    return resolve(q, it);
+    Question query = q;
+    std::vector<ResourceRecord> chain;
+    while (true) {
+        if (it < 0)
+            break;
+        ResolverResult res = resolve(query, it);
+        if (res.status != ResolverStatus::Success)
+            return res;
+        for (const ResourceRecord& rr : res.msg.answers) {
+            if (rr.rrtype == static_cast<RRType>(q.qtype)) {
+                res.msg.answers.insert(res.msg.answers.begin(), chain.begin(), chain.end());
+                res.msg.header.ancount = res.msg.answers.size();
+                res.msg.questions.resize(1);
+                res.msg.header.qdcount = 1;
+                res.msg.questions[0] = q;
+                return res;
+            } else if (rr.rrtype == RRType::CNAME) {
+                chain.push_back(rr);
+                query = {rr.rdata, q.qtype, q.qclass};
+            }
+        }
+    }
+    return {ResolverStatus::LoopDetected, RCode::ServFail};
 }
 
 // dig @localhost www.brother.in -p 3169 
@@ -196,8 +217,8 @@ Resolver::resolve(const Question& q, int& n_iterations) {
                 chain.push_back(cname->rrset.front());
                 auto entry = cache.get(
                     cname->rrset.front().rdata,
-                    static_cast<RRType>(q.qtype),
-                    q.qclass
+                    RRType::CNAME,
+                    DNSClass::IN
                 );
                 if (entry) {
                     Message ret = Message::from_cache_entry(chain, *entry, q);

@@ -15,7 +15,7 @@ enum class ResolverStatus {
 struct ResolverResult {
     ResolverStatus status;
     RCode code;
-    Message rcvd_msg;
+    Message msg;
     explicit operator bool() {
         return status == ResolverStatus::Success;
     }
@@ -58,5 +58,5 @@ private:
     );
 
     void
-    finalize_response(Message& m, ResolverResult res, const ClientContext& cli);
+    finalize_response(ResolverResult& res, const ClientContext& cli);
 };
