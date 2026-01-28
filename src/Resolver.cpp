@@ -178,28 +178,28 @@ Resolver::resolve(const Question& q) {
         if (res.status != ResolverStatus::Success)
             return res;
         for (const ResourceRecord& rr : res.msg.answers) {
-            if (rr.rrtype == static_cast<RRType>(q.qtype)) {
+            if (rr.type == static_cast<RRType>(q.type)) {
                 res.msg.answers.insert(res.msg.answers.begin(), chain.begin(), chain.end());
                 res.msg.header.ancount = res.msg.answers.size();
                 res.msg.questions.resize(1);
                 res.msg.header.qdcount = 1;
                 res.msg.questions[0] = q;
                 return res;
-            } else if (rr.rrtype == RRType::CNAME) {
+            } else if (rr.type == RRType::CNAME) {
                 chain.push_back(rr);
-                query = {rr.rdata, q.qtype, q.qclass};
+                query = {rr.rdata, q.type, q.klass};
             }
         }
     }
     return {ResolverStatus::LoopDetected, RCode::ServFail};
 }
 
-// dig @localhost www.brother.in -p 3169 
+
 ResolverResult
 Resolver::resolve(const Question& q, int& n_iterations) {
     {
         {
-            auto entry = cache.get(q.qname, static_cast<RRType>(q.qtype), q.qclass);
+            auto entry = cache.get(q.qname, static_cast<RRType>(q.type), q.klass);
             if (entry) {
                 Message ret = Message::from_cache_entry(*entry, q);
                 return {ResolverStatus::Success, entry->code, ret};
@@ -294,7 +294,7 @@ Resolver::resolve(const Question& q, int& n_iterations) {
 
             if (rcvd_msg->header.arcount <= 1) {
                 for (const ResourceRecord& ns : rcvd_msg->authorities) {
-                    if (ns.rrtype != RRType::NS)
+                    if (ns.type != RRType::NS)
                         continue;
                     ResolverResult res = resolve({ns.rdata, QType::A, DNSClass::IN}, n_iterations);
                     if (res.status == ResolverStatus::Success)

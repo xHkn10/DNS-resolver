@@ -87,14 +87,14 @@ static_assert(
 
 struct Question {
     std::vector<u8> qname;
-    QType qtype{};
-    DNSClass qclass{};
+    QType type{};
+    DNSClass klass{};
 };
 
 struct ResourceRecord {
     std::vector<u8> name;
-    RRType rrtype{};
-    DNSClass rrclass{}; // udp payload sz in edns
+    RRType type{};
+    DNSClass klass{}; // udp payload sz in edns
     u32 ttl{};     // extended rcode (8 bits), version (8 bits), flags (16 bits) in edns
     u16 rdlength{};
     std::vector<u8> rdata;

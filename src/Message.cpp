@@ -80,7 +80,7 @@ Message::put_edns_opt() {
 const ResourceRecord*
 Message::get_edns_opt_record() const {
     for (const ResourceRecord& rr : additional)
-        if (rr.rrtype == RRType::OPT)
+        if (rr.type == RRType::OPT)
             return &rr;
     return nullptr;
 }
@@ -91,7 +91,7 @@ Message::assign_edns_related_fields(ClientContext& cli) const {
     if (opt == nullptr)
         return;
     cli.uses_edns = true;
-    cli.max_payload = static_cast<u16>(opt->rrclass);
+    cli.max_payload = static_cast<u16>(opt->klass);
     cli.wants_dnssec = static_cast<bool>(opt->ttl & 0x8000);
 }
 
@@ -133,7 +133,7 @@ Message::strip_sections() {
 bool
 Message::has_glue() const {
     for (const ResourceRecord& rr : additional)
-        if (rr.rrtype == RRType::A)
+        if (rr.type == RRType::A)
             return true;
     return false;
 }
@@ -264,8 +264,8 @@ Message::serialize() const {
             return std::nullopt;
         if (bound_check(cursor, 4, packet.size()))
             return std::nullopt;
-        write_u16(static_cast<u16>(q.qtype), packet, cursor);
-        write_u16(static_cast<u16>(q.qclass), packet, cursor);
+        write_u16(static_cast<u16>(q.type), packet, cursor);
+        write_u16(static_cast<u16>(q.klass), packet, cursor);
     }
 
     for (const auto* v : {&answers, &authorities, &additional}) {
@@ -274,12 +274,12 @@ Message::serialize() const {
                 return std::nullopt;
             if (bound_check(cursor, 10, packet.size()))
                 return std::nullopt;
-            write_u16(static_cast<u16>(rr.rrtype), packet, cursor);
-            write_u16(static_cast<u16>(rr.rrclass), packet, cursor);
+            write_u16(static_cast<u16>(rr.type), packet, cursor);
+            write_u16(static_cast<u16>(rr.klass), packet, cursor);
             write_u32(rr.ttl, packet, cursor);
             write_u16(rr.rdlength, packet, cursor);
 
-            switch (rr.rrtype) {
+            switch (rr.type) {
                 case RRType::A:
                     if (!serialize_ipv4(rr.rdata))
                         return std::nullopt;
@@ -303,8 +303,8 @@ Message::serialize() const {
                         return std::nullopt;
                     break;
                 default:
-                    std::cerr << "rrtype "
-                    << static_cast<u16>(rr.rrtype)
+                    std::cerr << "type "
+                    << static_cast<u16>(rr.type)
                     << " to be implemented\n";
                     break;
                     //return std::nullopt;
@@ -326,7 +326,7 @@ Message::deserialize(const std::vector<u8>& packet) {
 
 std::string Message::rdata_to_string(const ResourceRecord& rr) {
     std::string res;
-    switch (rr.rrtype) {
+    switch (rr.type) {
         case RRType::A:
             for (i32 i = 0; i < 4; ++i) {
                 res.append(std::to_string(rr.rdata[i]));
@@ -362,7 +362,7 @@ std::string Message::rdata_to_string(const ResourceRecord& rr) {
         default:
             std::cerr
             << "rdata_to_string not implemented for rrtye "
-            << static_cast<u16>(rr.rrtype) << '\n';
+            << static_cast<u16>(rr.type) << '\n';
             break;
     }
     return res;
@@ -429,8 +429,8 @@ Message::deserialize_question_(
     
     if (bound_check(cursor, 4, packet.size()))
         return false;
-    read_u16(q.qtype, packet, cursor);
-    read_u16(q.qclass, packet, cursor);
+    read_u16(q.type, packet, cursor);
+    read_u16(q.klass, packet, cursor);
     
     questions.push_back(std::move(q));
 
@@ -449,12 +449,12 @@ Message::deserialize_rr_(
     if (bound_check(cursor, 10, packet.size()))
         return false;
 
-    read_u16(rr.rrtype, packet, cursor);
-    read_u16(rr.rrclass, packet, cursor);
+    read_u16(rr.type, packet, cursor);
+    read_u16(rr.klass, packet, cursor);
     read_u32(rr.ttl, packet, cursor);
     read_u16(rr.rdlength, packet, cursor);
 
-    switch (rr.rrtype) {
+    switch (rr.type) {
         case RRType::NS: [[fallthrough]];
         case RRType::CNAME: [[fallthrough]];
         case RRType::PTR:
@@ -517,7 +517,7 @@ Message::deserialize_rr_(
         default:
             std::cerr
             << "rr type "
-            << static_cast<u16>(rr.rrtype)
+            << static_cast<u16>(rr.type)
             << " to be implemented.\n";
             cursor += rr.rdlength;
             break;

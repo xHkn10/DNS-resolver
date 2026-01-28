@@ -10,7 +10,7 @@
 
 Cache::Cache() {
     for (const ResourceRecord& rr : dns::roots::ALL)
-        put_positive({rr.name, rr.rrtype, rr.rrclass}, {rr});
+        put_positive({rr.name, rr.type, rr.klass}, {rr});
 
     std::vector<ResourceRecord> root_ns_rrset;
     for (const ResourceRecord& rr : dns::roots::ALL)
@@ -47,10 +47,10 @@ Cache::put_negative(const CacheKey& k, RCode code, u32 soa_ttl) {
 }
 
 std::optional<CacheEntry>
-Cache::get(std::span<const u8> name, RRType rrtype, DNSClass rrclass) {
+Cache::get(std::span<const u8> name, RRType type, DNSClass klass) {
 
     std::vector<u8> norm = util::normalize(name);
-    auto it = cache_.find({norm, rrtype, rrclass});
+    auto it = cache_.find({norm, type, klass});
     
     if (it == cache_.end())
         return std::nullopt;
@@ -97,25 +97,25 @@ Cache::cache_msg(const Message& m) {
     const ResourceRecord* soa = nullptr;
 
     for (const ResourceRecord& rr : m.authorities)
-        if (rr.rrtype == RRType::NS)
-            grp[{rr.name, RRType::NS, rr.rrclass}].push_back(rr);
-        else if (rr.rrtype == RRType::SOA)
+        if (rr.type == RRType::NS)
+            grp[{rr.name, RRType::NS, rr.klass}].push_back(rr);
+        else if (rr.type == RRType::SOA)
             soa = &rr;
     
     for (const ResourceRecord& rr : m.answers)
-        grp[{rr.name, rr.rrtype, rr.rrclass}].push_back(rr);
+        grp[{rr.name, rr.type, rr.klass}].push_back(rr);
 
     for (const ResourceRecord& rr : m.additional)
-        if (rr.rrtype == RRType::A || rr.rrtype == RRType::AAAA)
-            grp[{rr.name, rr.rrtype, rr.rrclass}].push_back(rr);
+        if (rr.type == RRType::A || rr.type == RRType::AAAA)
+            grp[{rr.name, rr.type, rr.klass}].push_back(rr);
 
     if (soa && m.header.ancount == 0) {
         u32 soa_minimum;
         std::memcpy(&soa_minimum, soa->rdata.data() + soa->rdata.size() - 4, 4);
         put_negative({
             m.questions.front().qname,
-            static_cast<RRType>(m.questions.front().qtype),
-            m.questions.front().qclass
+            static_cast<RRType>(m.questions.front().type),
+            m.questions.front().klass
         }, m.header.get_err_code(), soa_minimum);
     }
 
