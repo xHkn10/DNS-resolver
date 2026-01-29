@@ -67,10 +67,10 @@ Cache::get(std::span<const u8> name, T type, DNSClass klass) {
     
     const auto now = std::chrono::steady_clock::now();
 
-    // if (now >= it->second.expires_at) {
-    //     cache_.erase(it);
-    //     return std::nullopt;
-    // }
+    if (now >= it->second.expires_at) {
+        cache_.erase(it);
+        return std::nullopt;
+    }
 
     CacheEntry res = it->second;
 
