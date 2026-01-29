@@ -23,6 +23,7 @@ Resolver::init() {
     listen_addr.sin_family = AF_INET;
     listen_addr.sin_port = htons(port);
     listen_addr.sin_addr.s_addr = INADDR_ANY;
+    
     if (bind(
         listen_sock,
         reinterpret_cast<sockaddr*>(&listen_addr),
@@ -166,8 +167,14 @@ Resolver::send_formerr(
     );
 }
 
+// dig @localhost cloudflare.com TXT -p 3169
+
 ResolverResult
 Resolver::resolve(const Question& q) {
+
+    if (q.type == QType::ANY)
+        return {ResolverStatus::Success, RCode::NotImp};
+
     Question active_query = q;
     std::vector<ResourceRecord> chain;
 
@@ -243,12 +250,15 @@ Resolver::resolve(const Question& q, int& n_iterations) {
             break;
 
         CacheEntry best_nss = cache.find_best_ns_rrset(q.qname);
+        util::shuffle(best_nss.rrset);
+
         std::vector<ResourceRecord> a_records;
         for (const ResourceRecord& ns : best_nss.rrset) {
             auto entry = cache.get(ns.rdata, RRType::A, DNSClass::IN);
             if (entry)
                 a_records.insert(a_records.end(), entry->rrset.begin(), entry->rrset.end());
         }
+        util::shuffle(a_records);
 
         for (const ResourceRecord& a_record : a_records) {
             int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -278,6 +288,7 @@ Resolver::resolve(const Question& q, int& n_iterations) {
                 close(sockfd);
                 continue;
             }
+            buffer.resize(n);
 
             auto rcvd_msg = Message::deserialize(buffer);
             if (!rcvd_msg) {

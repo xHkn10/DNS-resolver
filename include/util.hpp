@@ -97,5 +97,8 @@ namespace util {
         return res;
     }
 
-
+    template <typename T>
+    inline void shuffle(std::vector<T>& v) {
+        std::shuffle(v.begin(), v.end(), seed());
+    }
 }

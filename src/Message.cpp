@@ -240,12 +240,45 @@ Message::serialize() const {
     auto serialize_soa_record = [&](std::span<const u8> v) {
         size_t mname_len = get_dn_len(v);
         size_t rname_len = get_dn_len(v.subspan(mname_len));
-        serialize_dn(v);
-        serialize_dn(v.subspan(mname_len));
+        if (!serialize_dn(v))
+            return false;
+        if (!serialize_dn(v.subspan(mname_len)))
+            return false;
         if (bound_check(cursor, 20, packet.size()))
             return false;
         std::memcpy(packet.data() + cursor, v.data() + mname_len + rname_len, 20);
         cursor += 20;
+        return true;
+    };
+    auto serialize_mx = [&](std::span<const u8> v) {
+        if (bound_check(cursor, 2, packet.size()))
+            return false;
+        std::memcpy(packet.data() + cursor, v.data(), 2);
+        cursor += 2;
+        if (!serialize_dn(v.subspan(2)))
+            return false;
+        return true;
+    };
+    auto serialize_txt = [&](std::span<const u8> v, u16 rdlen) {
+        size_t consumed = 0;
+        while (consumed < rdlen) {
+            if (bound_check(cursor, 1, packet.size()))
+                return false;
+            u8 len = v[consumed++];
+            packet[cursor++] = len;
+            if (bound_check(cursor, len, packet.size()))
+                return false;
+            std::memcpy(packet.data() + cursor, v.data() + consumed, len);
+            consumed += len, cursor += len;
+        }
+        return true;
+    };
+    auto serialize_srv = [&](std::span<const u8> v) {
+        if (bound_check(cursor, 6, packet.size()))
+            return false;
+        std::memcpy(packet.data() + cursor, v.data(), 6);
+        if (!serialize_dn(v.subspan(6)))
+            return false;
         return true;
     };
 
@@ -271,6 +304,7 @@ Message::serialize() const {
                 return std::nullopt;
             if (bound_check(cursor, 10, packet.size()))
                 return std::nullopt;
+            
             write_u16(static_cast<u16>(rr.type), packet, cursor);
             write_u16(static_cast<u16>(rr.klass), packet, cursor);
             write_u32(rr.ttl, packet, cursor);
@@ -299,12 +333,21 @@ Message::serialize() const {
                     if (!serialize_soa_record(rr.rdata))
                         return std::nullopt;
                     break;
-                default:
-                    std::cerr << "type "
-                    << static_cast<u16>(rr.type)
-                    << " to be implemented\n";
+                case RRType::MX:
+                    if (!serialize_mx(rr.rdata))
+                        return std::nullopt;
                     break;
-                    //return std::nullopt;
+                case RRType::TXT:
+                    if (!serialize_txt(rr.rdata, rr.rdlength))
+                        return std::nullopt;
+                    break;
+                case RRType::SRV:
+                    if (!serialize_srv(rr.rdata))
+                        return std::nullopt;
+                    break;
+                default:
+                    std::cerr << "type " << rr.type << " to be implemented\n";
+                    break;
             }
         }
     }
@@ -494,7 +537,7 @@ Message::deserialize_rr_(
                 i += 4 + opt_len;
             }
             break;
-        case RRType::SOA: {
+        case RRType::SOA:
             if (!deserialize_dn_(rr.rdata, packet, cursor))
                 return false;
             if (!deserialize_dn_(rr.rdata, packet, cursor))
@@ -510,7 +553,49 @@ Message::deserialize_rr_(
             cursor += 20;
             rr.rdlength = static_cast<u16>(rr.rdata.size());
             break;
+        case RRType::MX:
+            if (bound_check(cursor, 2, packet.size()))
+                return false;
+            rr.rdata.reserve(rr.rdlength); rr.rdata.resize(2);
+            std::memcpy(rr.rdata.data(), packet.data() + cursor, 2);
+            cursor += 2;
+            if (!deserialize_dn_(rr.rdata, packet, cursor))
+                return false;
+            rr.rdlength = static_cast<u16>(rr.rdata.size());
+            break;
+        case RRType::TXT: {
+            rr.rdata.resize(rr.rdlength);
+            size_t consumed = 0;
+            while (consumed < rr.rdlength) {
+                if (bound_check(cursor, 1, packet.size()))
+                    return false;
+                u8 len = packet[cursor++];
+                if (bound_check(consumed, 1, rr.rdata.size()))
+                    return false;
+                rr.rdata[consumed++] = len;
+                if (bound_check(cursor, len, packet.size()))
+                    return false;
+                if (bound_check(consumed, len, rr.rdata.size()))
+                    return false;
+                std::memcpy(rr.rdata.data() + consumed, packet.data() + cursor, len);
+                consumed += len, cursor += len;
+            }
+            if (consumed != rr.rdlength) {
+                std::cerr << "malformed txt packet\n";
+                return false;
+            }
+            break;
         }
+        case RRType::SRV:
+            rr.rdata.resize(6);
+            if (!bound_check(cursor, 6, packet.size()))
+                return false;
+            std::memcpy(rr.rdata.data(), packet.data() + cursor, 6);
+            cursor += 6;
+            if (!deserialize_dn_(rr.rdata, packet, cursor))
+                return false;
+            rr.rdlength = static_cast<u16>(rr.rdata.size());
+            break;
         default:
             std::cerr
             << "rr type "
