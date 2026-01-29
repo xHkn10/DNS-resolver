@@ -60,8 +60,15 @@ public:
 
     void cache_msg(const Message& m);
 
+    template <typename T>
+    requires
+    std::same_as<std::remove_cvref_t<T>, RRType>
+    || std::same_as<std::remove_cvref_t<T>, QType>
     std::optional<CacheEntry>
-    get(std::span<const u8> name, RRType rrtype, DNSClass rrclass);
+    get(std::span<const u8> name, T type, DNSClass klass);
+
+    std::optional<CacheEntry>
+    get(CacheKey k);
 
     CacheEntry
     find_best_ns_rrset(const std::vector<u8>& name);

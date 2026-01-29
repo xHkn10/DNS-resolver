@@ -174,12 +174,9 @@ Message::from_cache_entry(
 ) {
     Message res;
     res.header.flags |= static_cast<u32>(entry.code);
-    
     res.header.ancount = chain.size() + entry.rrset.size();
-    
     res.answers = chain;
     res.answers.insert(res.answers.end(), entry.rrset.begin(), entry.rrset.end());
-
     res.header.qdcount = 1;
     res.questions.push_back(q);
     return res;

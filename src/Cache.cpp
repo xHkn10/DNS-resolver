@@ -4,6 +4,7 @@
 #include "util.hpp"
 #include "constants.hpp"
 #include <chrono>
+#include <concepts>
 #include <optional>
 #include <span>
 #include <vector>
@@ -46,11 +47,49 @@ Cache::put_negative(const CacheKey& k, RCode code, u32 soa_ttl) {
     );
 }
 
+template std::optional<CacheEntry>
+Cache::get<QType>(std::span<const u8>, QType, DNSClass);
+template std::optional<CacheEntry>
+Cache::get<RRType>(std::span<const u8>, RRType, DNSClass);
+
+template <typename T>
+requires
+std::same_as<std::remove_cvref_t<T>, RRType>
+|| std::same_as<std::remove_cvref_t<T>, QType>
 std::optional<CacheEntry>
-Cache::get(std::span<const u8> name, RRType type, DNSClass klass) {
+Cache::get(std::span<const u8> name, T type, DNSClass klass) {
 
     std::vector<u8> norm = util::normalize(name);
-    auto it = cache_.find({norm, type, klass});
+    auto it = cache_.find({norm, static_cast<RRType>(type), klass});
+    
+    if (it == cache_.end())
+        return std::nullopt;
+    
+    const auto now = std::chrono::steady_clock::now();
+
+    // if (now >= it->second.expires_at) {
+    //     cache_.erase(it);
+    //     return std::nullopt;
+    // }
+
+    CacheEntry res = it->second;
+
+    const auto rem = std::chrono::duration_cast<std::chrono::seconds>(
+        res.expires_at - now
+    ).count();
+    
+    for (ResourceRecord& rr : res.rrset)
+        rr.ttl = rem;
+
+    return res;
+}
+
+
+std::optional<CacheEntry>
+Cache::get(CacheKey k) {
+
+    k.name = util::normalize(k.name);
+    auto it = cache_.find(k);
     
     if (it == cache_.end())
         return std::nullopt;

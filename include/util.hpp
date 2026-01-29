@@ -18,6 +18,24 @@ inline std::ostream& operator<<(std::ostream& os, RCode code) {
     return os;
 }
 
+
+inline std::ostream& operator<<(std::ostream& os, RRType type) {
+    switch (type) {
+        case RRType::A: os << "A"; break;
+        case RRType::NS: os << "NS"; break;
+        case RRType::CNAME: os << "CNAME"; break;
+        case RRType::SOA: os << "SOA"; break;
+        case RRType::PTR: os << "PTR"; break;
+        case RRType::MX: os << "MX"; break;
+        case RRType::TXT: os << "TXT"; break;
+        case RRType::AAAA: os << "AAAA"; break;
+        case RRType::SRV: os << "SRV"; break;
+        case RRType::OPT: os << "OPT"; break;
+        default: os << "UNKOWN TYPE"; break;
+    }
+    return os;
+}
+
 namespace util {
     inline void pretty_print_bytes(const std::vector<u8>& bytes) {
         for (u8 b : bytes) {
@@ -78,4 +96,6 @@ namespace util {
             res.push_back(c - ('A' <= c && c <= 'Z') * off);
         return res;
     }
+
+
 }

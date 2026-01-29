@@ -168,67 +168,71 @@ Resolver::send_formerr(
 
 ResolverResult
 Resolver::resolve(const Question& q) {
-    int it = max_iterations;
-    Question query = q;
+    Question active_query = q;
     std::vector<ResourceRecord> chain;
+
+    {
+        int limit = 8; // follow cname chain
+        while (true) {
+            if (--limit < 0)
+                break;
+            auto entry = cache.get(active_query.qname, q.type, q.klass);
+            if (entry)
+                return {
+                    ResolverStatus::Success,
+                    entry->code,
+                    Message::from_cache_entry(chain, *entry, q)
+                };
+            auto cname = cache.get(active_query.qname, RRType::CNAME, DNSClass::IN);
+            if (cname && !cname->rrset.empty()) {
+                active_query = {cname->rrset.front().rdata, q.type, q.klass};
+                chain.push_back(cname->rrset.front());
+            } else
+                break;
+        }
+    }
+    
+    int it = max_iterations;
     while (true) {
         if (it < 0)
             break;
-        ResolverResult res = resolve(query, it);
+
+        ResolverResult res = resolve(active_query, it);
         if (res.status != ResolverStatus::Success)
             return res;
+
         for (const ResourceRecord& rr : res.msg.answers) {
             if (rr.type == static_cast<RRType>(q.type)) {
                 res.msg.answers.insert(res.msg.answers.begin(), chain.begin(), chain.end());
                 res.msg.header.ancount = res.msg.answers.size();
                 res.msg.questions.resize(1);
+                res.msg.questions.front() = q;
                 res.msg.header.qdcount = 1;
-                res.msg.questions[0] = q;
-                return res;
-            } else if (rr.type == RRType::CNAME) {
-                chain.push_back(rr);
-                query = {rr.rdata, q.type, q.klass};
+                return res;                
             }
         }
+
+        bool has_cname = false;
+        for (const ResourceRecord& rr : res.msg.answers) {
+            if (rr.type == RRType::CNAME) {
+                chain.push_back(rr);
+                active_query.qname = rr.rdata;
+                has_cname = true;
+                break;
+            }
+        }
+
+        if (!has_cname)
+            return res;
     }
+
     return {ResolverStatus::LoopDetected, RCode::ServFail};
 }
 
 
 ResolverResult
 Resolver::resolve(const Question& q, int& n_iterations) {
-    {
-        {
-            auto entry = cache.get(q.qname, static_cast<RRType>(q.type), q.klass);
-            if (entry) {
-                Message ret = Message::from_cache_entry(*entry, q);
-                return {ResolverStatus::Success, entry->code, ret};
-            }
-        }
-
-        int limit = 8; // follow cname chain
-        std::vector<u8> cur = q.qname;
-        std::vector<ResourceRecord> chain;
-        while (true) {
-            if (--limit == 0)
-                break;
-            auto cname = cache.get(cur, RRType::CNAME, DNSClass::IN);
-            if (cname && cname->rrset.size() > 0) {
-                chain.push_back(cname->rrset.front());
-                auto entry = cache.get(
-                    cname->rrset.front().rdata,
-                    RRType::CNAME,
-                    DNSClass::IN
-                );
-                if (entry) {
-                    Message ret = Message::from_cache_entry(chain, *entry, q);
-                    return {ResolverStatus::Success, entry->code, ret};
-                }
-                cur = cname->rrset.front().rdata;
-            } else break;
-        }
-    }
-
+    
     Message query_msg = Message::from_question(q);
     auto bytes = query_msg.serialize();
     if (!bytes)
@@ -292,7 +296,7 @@ Resolver::resolve(const Question& q, int& n_iterations) {
             if (rcvd_msg->header.is_authoritative())
                 return {ResolverStatus::Success, rcvd_msg_code, *rcvd_msg};
 
-            if (rcvd_msg->header.arcount <= 1) {
+            if (!rcvd_msg->has_glue()) {
                 for (const ResourceRecord& ns : rcvd_msg->authorities) {
                     if (ns.type != RRType::NS)
                         continue;
