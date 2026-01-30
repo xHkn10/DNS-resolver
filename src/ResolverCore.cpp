@@ -23,7 +23,7 @@ ResolverCore::make_formerr(std::vector<u8>& bytes) {
     memset(bytes.data() + 2, 0, (bytes.size() - 2) * sizeof(u8));
     bytes[2] |= 0x80; // qr bit set
     bytes[3] |= 0x80; // ra bit set
-    bytes[3] |= static_cast<u8>(RCode::ServFail);
+    bytes[3] |= static_cast<u8>(RCode::FormErr);
     bytes.resize(Header::HEADER_SZ);
 }
 

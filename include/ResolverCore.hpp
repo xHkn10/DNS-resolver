@@ -27,15 +27,6 @@ public:
     awaitable<ResolverResult>
     resolve(const Question& q, int& n_it);
 
-    void
-    finalize_response(ResolverResult& res, const ClientContext& cli);
-
-    void
-    make_servfail(std::vector<u8>& bytes);
-
-    void
-    make_formerr(std::vector<u8>& bytes);
-
     awaitable<size_t>
     query_in_udp(
         const ResourceRecord& rr,
@@ -49,6 +40,16 @@ public:
         const std::vector<u8>& query_bytes, 
         std::vector<u8>& buf
     );
+    
+    void
+    finalize_response(ResolverResult& res, const ClientContext& cli);
+
+    void
+    make_servfail(std::vector<u8>& bytes);
+
+    void
+    make_formerr(std::vector<u8>& bytes);
+
 
     std::optional<Message>
     parse_and_validate_response(

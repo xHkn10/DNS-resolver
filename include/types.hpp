@@ -80,7 +80,7 @@ struct Header {
     inline void clear_rd_bit() {flags &= 0xFEFF;}
     inline void set_ra_bit() {flags |= 0x0080;}
     inline void clear_ra_bit() {flags &= 0xFF7F;}
-    inline void set_errcode(RCode code) {flags |= static_cast<u16>(code);}
+    inline void set_errcode(RCode code) {(flags &= 0xFFF0) |= static_cast<u16>(code);}
 } __attribute__((packed));
 
 static_assert(
