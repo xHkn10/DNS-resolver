@@ -40,16 +40,6 @@ public:
         const std::vector<u8>& query_bytes, 
         std::vector<u8>& buf
     );
-    
-    void
-    finalize_response(ResolverResult& res, const ClientContext& cli);
-
-    void
-    make_servfail(std::vector<u8>& bytes);
-
-    void
-    make_formerr(std::vector<u8>& bytes);
-
 
     std::optional<Message>
     parse_and_validate_response(

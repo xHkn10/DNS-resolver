@@ -6,6 +6,7 @@
 #include <vector>
 
 struct CacheEntry;
+struct ResolverResult;
 
 class Message {
 public:
@@ -19,20 +20,31 @@ public:
 
     std::optional<std::vector<u8>> serialize() const;
     static std::optional<Message> deserialize(const std::vector<u8>& packet);
-        
+    
     static Message from_question(const Question& q);
-    static Message from_cache_entry(const CacheEntry& entry, const Question& q);
+    static Message from_cache_entry(
+        const CacheEntry& entry,
+        const Question& q
+    );
     static Message from_cache_entry(
         const std::vector<ResourceRecord>& chain,
         const CacheEntry& entry,
         const Question& q
     );
+
+    
+    static void
+    finalize_response(ResolverResult& res, const ClientContext& cli);
+    static void
+    make_servfail(std::vector<u8>& bytes);
+    static void
+    make_formerr(std::vector<u8>& bytes);
     
     void put_random_id();
+    void put_edns_opt();
 
     bool has_glue() const;
 
-    void put_edns_opt();
     const ResourceRecord* get_edns_opt_record() const;
     void assign_edns_related_fields(ClientContext& cli) const;
 

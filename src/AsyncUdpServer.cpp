@@ -49,7 +49,7 @@ AsyncUdpServer::handle_cli(
 
     auto cli_query_msg = Message::deserialize(cli_query_bytes);
     if (!cli_query_msg) {
-        resolver.make_formerr(cli_query_bytes);
+        Message::make_formerr(cli_query_bytes);
         co_await sock.async_send_to(
             net::buffer(cli_query_bytes), cli, use_awaitable
         );
@@ -59,13 +59,13 @@ AsyncUdpServer::handle_cli(
     if (cli_query_msg->questions.size() == 0)
         co_return;
     if (!cli_query_msg->header.is_rd()) {
-        resolver.make_servfail(cli_query_bytes);
+        Message::make_servfail(cli_query_bytes);
         co_return;
     }
 
     ResolverResult res = co_await resolver.resolve(cli_query_msg->questions.front());
     if (res.status != ResolverStatus::Success) {
-        resolver.make_servfail(cli_query_bytes);
+        Message::make_servfail(cli_query_bytes);
         co_return;
     }
 
@@ -74,7 +74,7 @@ AsyncUdpServer::handle_cli(
     };
     cli_query_msg->assign_edns_related_fields(cli_ctx);
 
-    resolver.finalize_response(res, cli_ctx);
+    Message::finalize_response(res, cli_ctx);
     auto response_bytes = res.msg.serialize();
 
     if (!response_bytes)

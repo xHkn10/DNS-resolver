@@ -1,7 +1,8 @@
 #include "Message.hpp"
 #include "Cache.hpp"
 #include "util.hpp"
-#include <types.hpp>
+#include "ResolverStructs.hpp"
+#include "types.hpp"
 
 #include <cstddef>
 #include <optional>
@@ -64,6 +65,49 @@ namespace {
         return false;
     }
 }
+
+void
+Message::make_formerr(std::vector<u8>& bytes) {
+    memset(bytes.data() + 2, 0, (bytes.size() - 2) * sizeof(u8));
+    bytes[2] |= 0x80; // qr bit set
+    bytes[3] |= 0x80; // ra bit set
+    bytes[3] |= static_cast<u8>(RCode::FormErr);
+    bytes.resize(Header::HEADER_SZ);
+}
+
+void
+Message::make_servfail(std::vector<u8>& bytes) {
+    memset(bytes.data() + 2, 0, (bytes.size() - 2) * sizeof(u8));
+    bytes[2] |= 0x80; // qr bit set
+    bytes[3] |= 0x80; // ra bit set
+    bytes[3] |= static_cast<u8>(RCode::ServFail);
+    // bytes.resize(Header::HEADER_SZ);
+}
+
+void
+Message::finalize_response(ResolverResult& res, const ClientContext& cli) {
+    res.msg.header.id = cli.id;
+    res.msg.header.set_qr_bit();
+    res.msg.header.set_rd_bit();
+    res.msg.header.set_ra_bit();
+    res.msg.header.clear_aa_bit();
+    res.msg.header.set_errcode(res.code);
+
+    if (res.status == ResolverStatus::Success) {
+        if (res.msg.header.ancount > 0)
+            res.msg.strip_sections();
+        else {
+            res.msg.additional.clear();
+            res.msg.header.arcount = 0;
+        }
+        if (cli.uses_edns)
+            res.msg.put_edns_opt();
+    }
+
+    if (res.msg.size() > cli.max_payload)
+        res.msg.truncate_msg(cli.max_payload);
+}
+
 
 void
 Message::put_random_id() {
