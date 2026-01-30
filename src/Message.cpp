@@ -1,11 +1,12 @@
 #include "Message.hpp"
 #include "Cache.hpp"
 #include "util.hpp"
+#include <types.hpp>
+
 #include <cstddef>
 #include <optional>
 #include <span>
 #include <string>
-#include <types.hpp>
 #include <cstring>
 #include <iomanip>
 #include <iostream>

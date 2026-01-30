@@ -1,17 +1,14 @@
-#include "Message.hpp"
 #include "SyncUdpResolver.hpp"
+#include "Message.hpp"
 #include "Cache.hpp"
-#include "types.hpp"
+#include "ResolverStructs.hpp"
 #include "util.hpp"
+#include "types.hpp"
 
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <cstddef>
-#include <optional>
 #include <unistd.h>
-#include <iostream>
-#include <vector>
 
 
 SyncUdpResolver::SyncUdpResolver(u16 port, size_t max_buffer_sz) 
@@ -99,7 +96,7 @@ SyncUdpResolver::listen() {
             cli_addr_len
         );
 
-        std::cout << "Response sent\n";
+        LOG("Response sent\n");
     }
 
     close(listen_sock);

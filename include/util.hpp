@@ -7,6 +7,12 @@
 #include <iostream>
 #include <iomanip>
 
+#ifdef DEBUG_MODE
+    #define LOG(msg) std::cout << "[LOG] " << msg << std::endl
+#else
+    #define LOG(msg)
+#endif
+
 inline std::ostream& operator<<(std::ostream& os, RCode code) {
     switch (code) {
         case RCode::NoError: os << "NoError"; break;

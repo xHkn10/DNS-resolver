@@ -1,10 +1,10 @@
 #pragma once
 
-#include "ResolverStructs.hpp"
 #include "Cache.hpp"
 #include "types.hpp"
 #include <netinet/in.h>
 
+struct ResolverResult;
 
 class SyncUdpResolver {
 private:

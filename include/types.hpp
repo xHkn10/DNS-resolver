@@ -5,6 +5,8 @@
 #include <netinet/in.h>
 #include <vector>
 
+class Message;
+
 using u8 = std::uint8_t;
 using u16 = std::uint16_t;
 using u32 = std::uint32_t;
@@ -12,8 +14,6 @@ using i32 = std::int32_t;
 using std::size_t;
 
 constexpr u16 DNS_PORT = 53;
-
-class Message;
 
 enum class DNSClass : u16 {
     IN = 1,
@@ -69,6 +69,7 @@ struct Header {
     inline RCode get_err_code() const {return static_cast<RCode>(flags & 0xF);}
     inline bool is_authoritative() const {return flags & 0x0400;}
     inline bool is_rd() const {return flags & 0x0100;}
+    inline bool is_tc() const {return flags & 0x0200;}
     inline void set_qr_bit() {flags |= 0x8000;}
     inline void clear_qr_bit() {flags &= 0x7FFF;}
     inline void set_aa_bit() {flags |= 0x0400;}

@@ -1,5 +1,7 @@
 //#include "SyncUdpResolver.hpp"
-#include "AsyncUdpResolver.hpp"
+#include "AsyncTcpServer.hpp"
+#include "AsyncUdpServer.hpp"
+#include "ResolverCore.hpp"
 #include <exception>
 #include <iostream>
 #include <netinet/in.h>
@@ -15,8 +17,13 @@ int main() {
 
     try {
         net::io_context io;
-        AsyncUdpResolver r{};
-        net::co_spawn(io, r.listen(port), net::detached);
+
+        ResolverCore core{};
+        AsyncUdpServer udp_r{core};
+        AsyncTcpServer tcp_r{core};
+        
+        net::co_spawn(io, udp_r.listen(port), net::detached);
+        net::co_spawn(io, tcp_r.listen(port), net::detached);
 
         std::cout << "Listening on port " << port << std::endl;
 

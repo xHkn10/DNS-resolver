@@ -4,10 +4,10 @@
 #include "Message.hpp"
 
 enum class ResolverStatus {
-    Success,         // Found an answer OR authoritative proof of non-existence
-    LoopDetected,    // Fatal: CNAME loop or depth exceeded
-    NoCandidates,    // Fatal: Checked all NS records and all failed
-    InternalError    // Fatal: Serialization failed, etc.
+    Success,         // found an answer or NXDOMAIN or NODATA
+    LoopDetected,    // CNAME loop or depth exceeded
+    NoCandidates,    // checked all NS records and all failed
+    InternalError    // serialization failed etc
 };
 
 struct ResolverResult {
