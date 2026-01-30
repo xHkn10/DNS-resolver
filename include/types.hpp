@@ -65,22 +65,33 @@ struct Header {
     u16 ancount{};
     u16 nscount{};
     u16 arcount{};
+
     static constexpr size_t HEADER_SZ = 12;
-    inline RCode get_err_code() const {return static_cast<RCode>(flags & 0xF);}
-    inline bool is_authoritative() const {return flags & 0x0400;}
-    inline bool is_rd() const {return flags & 0x0100;}
-    inline bool is_tc() const {return flags & 0x0200;}
-    inline void set_qr_bit() {flags |= 0x8000;}
-    inline void clear_qr_bit() {flags &= 0x7FFF;}
-    inline void set_aa_bit() {flags |= 0x0400;}
-    inline void clear_aa_bit() {flags &= 0xFBFF;}
-    inline void set_tc_bit() {flags |= 0x0200;}
-    inline void clear_tc_bit() {flags &= 0xFDFF;}
-    inline void set_rd_bit() {flags |= 0x0100;}
-    inline void clear_rd_bit() {flags &= 0xFEFF;}
-    inline void set_ra_bit() {flags |= 0x0080;}
-    inline void clear_ra_bit() {flags &= 0xFF7F;}
-    inline void set_errcode(RCode code) {(flags &= 0xFFF0) |= static_cast<u16>(code);}
+    static constexpr u16 MASK_QR = 0x8000;
+    static constexpr u16 MASK_AA = 0x0400;
+    static constexpr u16 MASK_TC = 0x0200;
+    static constexpr u16 MASK_RD = 0x0100;
+    static constexpr u16 MASK_RA = 0x0080;
+    static constexpr u16 MASK_RCODE = 0x000F;
+
+    inline RCode get_err_code() const {return static_cast<RCode>(flags & MASK_RCODE);}
+    inline void set_errcode(RCode code) {(flags &= ~MASK_RCODE) |= static_cast<u16>(code);}
+
+    inline bool is_authoritative() const {return flags & MASK_AA;}
+    inline bool is_rd() const {return flags & MASK_RD;}
+    inline bool is_tc() const {return flags & MASK_TC;}
+
+    inline void set_qr_bit() {flags |= MASK_QR;}
+    inline void set_aa_bit() {flags |= MASK_AA;}
+    inline void set_tc_bit() {flags |= MASK_TC;}
+    inline void set_ra_bit() {flags |= MASK_RA;}
+    inline void set_rd_bit() {flags |= MASK_RD;}
+
+    inline void clear_qr_bit() {flags &= ~MASK_QR;}
+    inline void clear_aa_bit() {flags &= ~MASK_AA;}
+    inline void clear_tc_bit() {flags &= ~MASK_TC;}
+    inline void clear_rd_bit() {flags &= ~MASK_RD;}
+    inline void clear_ra_bit() {flags &= ~MASK_RA;}
 } __attribute__((packed));
 
 static_assert(
