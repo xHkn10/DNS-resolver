@@ -13,6 +13,8 @@ using std::size_t;
 
 constexpr u16 DNS_PORT = 53;
 
+class Message;
+
 enum class DNSClass : u16 {
     IN = 1,
     CS = 2,

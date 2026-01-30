@@ -1,27 +1,12 @@
 #pragma once
 
+#include "ResolverStructs.hpp"
 #include "Cache.hpp"
-#include "Message.hpp"
 #include "types.hpp"
 #include <netinet/in.h>
 
-enum class ResolverStatus {
-    Success,         // Found an answer OR authoritative proof of non-existence
-    LoopDetected,    // Fatal: CNAME loop or depth exceeded
-    NoCandidates,    // Fatal: Checked all NS records and all failed
-    InternalError    // Fatal: Serialization failed, etc.
-};
 
-struct ResolverResult {
-    ResolverStatus status;
-    RCode code;
-    Message msg;
-    explicit operator bool() {
-        return status == ResolverStatus::Success;
-    }
-};
-
-class Resolver {
+class SyncUdpResolver {
 private:
     const u16 port = 3169;
     const size_t max_buffer_sz = 8192;
@@ -32,8 +17,8 @@ public:
     Cache cache;
 
 public:
-    Resolver(u16 port, size_t max_buffer_sz);
-    Resolver() = default;
+    SyncUdpResolver(u16 port, size_t max_buffer_sz);
+    SyncUdpResolver() = default;
     bool init();
     bool listen();
 
@@ -42,7 +27,7 @@ private:
     resolve(const Question& q);
 
     ResolverResult
-    resolve(const Question& q, int& n_iterations);
+    resolve(const Question& q, int& n_it);
     
     void
     send_formerr(

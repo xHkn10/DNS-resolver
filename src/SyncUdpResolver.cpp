@@ -1,5 +1,5 @@
 #include "Message.hpp"
-#include "Resolver.hpp"
+#include "SyncUdpResolver.hpp"
 #include "Cache.hpp"
 #include "types.hpp"
 #include "util.hpp"
@@ -14,16 +14,16 @@
 #include <vector>
 
 
-Resolver::Resolver(u16 port, size_t max_buffer_sz) 
+SyncUdpResolver::SyncUdpResolver(u16 port, size_t max_buffer_sz) 
 : port(port), max_buffer_sz(max_buffer_sz) {}
 
 bool
-Resolver::init() {
+SyncUdpResolver::init() {
     listen_sock = socket(AF_INET, SOCK_DGRAM, 0);
     listen_addr.sin_family = AF_INET;
     listen_addr.sin_port = htons(port);
     listen_addr.sin_addr.s_addr = INADDR_ANY;
-    
+
     if (bind(
         listen_sock,
         reinterpret_cast<sockaddr*>(&listen_addr),
@@ -40,7 +40,7 @@ Resolver::init() {
 }
 
 bool
-Resolver::listen() {
+SyncUdpResolver::listen() {
     while (true) {
         sockaddr_in cli_addr;
         socklen_t cli_addr_len = sizeof(cli_addr);
@@ -77,6 +77,8 @@ Resolver::listen() {
             send_servfail(cli_addr, cli_addr_len, packet);
             continue;
         }
+        if (cli_query->questions.size() == 0)
+            continue;
 
         ResolverResult res = resolve(cli_query->questions.front());
 
@@ -88,11 +90,8 @@ Resolver::listen() {
         finalize_response(res, cli_ctx);
 
         auto send_to_cli_bytes = res.msg.serialize();
-
-        if (!send_to_cli_bytes) {
-            std::cerr << "Error\n";
+        if (!send_to_cli_bytes)
             continue;
-        }
 
         sendto(
             listen_sock, send_to_cli_bytes->data(), send_to_cli_bytes->size(), 0,
@@ -107,7 +106,7 @@ Resolver::listen() {
 }
 
 void
-Resolver::finalize_response(
+SyncUdpResolver::finalize_response(
     ResolverResult& res,
     const ClientContext& cli
 ) {
@@ -133,7 +132,7 @@ Resolver::finalize_response(
 }
 
 void
-Resolver::send_servfail(
+SyncUdpResolver::send_servfail(
     const sockaddr_in& cli_addr,
     socklen_t cli_addr_len,
     std::vector<u8>& packet
@@ -150,7 +149,7 @@ Resolver::send_servfail(
 }
 
 void
-Resolver::send_formerr(
+SyncUdpResolver::send_formerr(
     const sockaddr_in& cli_addr,
     socklen_t cli_addr_len,
     std::vector<u8>& packet
@@ -167,10 +166,9 @@ Resolver::send_formerr(
     );
 }
 
-// dig @localhost cloudflare.com TXT -p 3169
 
 ResolverResult
-Resolver::resolve(const Question& q) {
+SyncUdpResolver::resolve(const Question& q) {
 
     if (q.type == QType::ANY)
         return {ResolverStatus::Success, RCode::NotImp};
@@ -238,7 +236,7 @@ Resolver::resolve(const Question& q) {
 
 
 ResolverResult
-Resolver::resolve(const Question& q, int& n_iterations) {
+SyncUdpResolver::resolve(const Question& q, int& n_it) {
     
     Message query_msg = Message::from_question(q);
     auto bytes = query_msg.serialize();
@@ -246,7 +244,7 @@ Resolver::resolve(const Question& q, int& n_iterations) {
         return {ResolverStatus::InternalError, RCode::ServFail};
 
     while (true) {
-        if (--n_iterations == 0)
+        if (--n_it < 0)
             break;
 
         CacheEntry best_nss = cache.find_best_ns_rrset(q.qname);
@@ -311,7 +309,7 @@ Resolver::resolve(const Question& q, int& n_iterations) {
                 for (const ResourceRecord& ns : rcvd_msg->authorities) {
                     if (ns.type != RRType::NS)
                         continue;
-                    ResolverResult res = resolve({ns.rdata, QType::A, DNSClass::IN}, n_iterations);
+                    ResolverResult res = resolve({ns.rdata, QType::A, DNSClass::IN}, n_it);
                     if (res.status == ResolverStatus::Success)
                         break;
                 }

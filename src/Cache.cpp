@@ -9,6 +9,7 @@
 #include <span>
 #include <vector>
 
+
 Cache::Cache() {
     for (const ResourceRecord& rr : dns::roots::ALL)
         put_positive({rr.name, rr.type, rr.klass}, {rr});
