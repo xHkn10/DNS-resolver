@@ -56,7 +56,7 @@ namespace {
         dst[cursor++] = static_cast<u8>(static_cast<u32>(src));
     }
 
-    inline bool
+    bool
     bound_check(size_t cursor, size_t bytes_to_read, size_t sz) {
         if (cursor + bytes_to_read > sz) {
             std::cerr << "Buffer overflow\n";
