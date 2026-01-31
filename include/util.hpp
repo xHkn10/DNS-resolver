@@ -1,16 +1,19 @@
 #pragma once
 
 #include "types.hpp"
+#include "config.hpp"
+
 #include <random>
 #include <span>
 #include <vector>
 #include <iostream>
 #include <iomanip>
 
-#ifdef DEBUG_MODE
-    #define LOG(msg) std::cout << "[LOG] " << msg << std::endl
+
+#ifndef DISABLE_LOG
+#define LOG(msg) std::cout << "[LOG] " << msg << std::endl
 #else
-    #define LOG(msg)
+#define LOG(msg)
 #endif
 
 inline std::ostream& operator<<(std::ostream& os, RCode code) {

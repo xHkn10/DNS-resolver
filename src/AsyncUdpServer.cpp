@@ -9,6 +9,12 @@
 #include <boost/asio/use_awaitable.hpp>
 #include <boost/asio/detached.hpp>
 
+#ifndef DISABLE_STATISTICS
+#include "metrics.hpp"
+#endif
+
+#define DISABLE_STATISTICS
+
 namespace net = boost::asio;
 using net::ip::udp;
 using net::awaitable;
@@ -44,6 +50,11 @@ AsyncUdpServer::handle_cli(
     udp::endpoint cli,
     udp::socket& sock
 ) {
+
+    #ifndef DISABLE_STATISTICS
+    ScopedMeasure measure{Metric::cli_resolve_total_udp};
+    #endif
+
     if (cli_query_bytes.size() < Header::HEADER_SZ)
         co_return;
 
@@ -70,7 +81,8 @@ AsyncUdpServer::handle_cli(
     }
 
     ClientContext cli_ctx{
-        .id = cli_query_msg->header.id
+        .id = cli_query_msg->header.id,
+        .cli_q = cli_query_msg->questions.front()
     };
     cli_query_msg->assign_edns_related_fields(cli_ctx);
 

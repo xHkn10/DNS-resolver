@@ -2,14 +2,13 @@
 #include "Message.hpp"
 #include "types.hpp"
 #include "util.hpp"
-#include "constants.hpp"
+#include "roots.hpp"
 
 #include <chrono>
 #include <concepts>
 #include <optional>
 #include <span>
 #include <vector>
-
 
 Cache::Cache() {
     for (const ResourceRecord& rr : dns::roots::ALL)
@@ -60,7 +59,6 @@ std::same_as<std::remove_cvref_t<T>, RRType>
 || std::same_as<std::remove_cvref_t<T>, QType>
 std::optional<CacheEntry>
 Cache::get(std::span<const u8> name, T type, DNSClass klass) {
-
     std::vector<u8> norm = util::normalize(name);
     auto it = cache_.find({norm, static_cast<RRType>(type), klass});
     
@@ -89,7 +87,6 @@ Cache::get(std::span<const u8> name, T type, DNSClass klass) {
 
 std::optional<CacheEntry>
 Cache::get(CacheKey k) {
-
     k.name = util::normalize(k.name);
     auto it = cache_.find(k);
     
@@ -133,7 +130,6 @@ Cache::find_best_ns_rrset(const std::vector<u8>& name) {
 
 void
 Cache::cache_msg(const Message& m) {
-
     std::unordered_map<CacheKey, std::vector<ResourceRecord>, CacheKeyHash> grp;
     const ResourceRecord* soa = nullptr;
 

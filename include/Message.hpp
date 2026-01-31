@@ -16,6 +16,8 @@ public:
     std::vector<ResourceRecord> authorities;
     std::vector<ResourceRecord> additional;
 
+    static constexpr size_t INITIAL_PACKET_SZ = 4096;
+
     Message() = default;
 
     std::optional<std::vector<u8>> serialize() const;

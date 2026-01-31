@@ -62,13 +62,6 @@ SyncUdpResolver::listen() {
             send_formerr(cli_addr, cli_addr_len, packet);
             continue;
         }
-        ClientContext cli_ctx{
-            .addr = cli_addr,
-            .addr_len = cli_addr_len,
-            .id = cli_query->header.id
-        };
-        cli_query->assign_edns_related_fields(cli_ctx);
-    
 
         if (!cli_query->header.is_rd()) {
             send_servfail(cli_addr, cli_addr_len, packet);
@@ -83,6 +76,12 @@ SyncUdpResolver::listen() {
             send_servfail(cli_addr, cli_addr_len, packet);
             continue;
         }
+
+        ClientContext cli_ctx{
+            .id = cli_query->header.id,
+            .cli_q = cli_query->questions.front()
+        };
+        cli_query->assign_edns_related_fields(cli_ctx);
         
         finalize_response(res, cli_ctx);
 
@@ -107,6 +106,8 @@ SyncUdpResolver::finalize_response(
     ResolverResult& res,
     const ClientContext& cli
 ) {
+    res.msg.questions.front() = cli.cli_q;
+
     res.msg.header.id = cli.id;
     res.msg.header.set_qr_bit();
     res.msg.header.set_rd_bit();
@@ -126,6 +127,8 @@ SyncUdpResolver::finalize_response(
 
     if (res.msg.size() > cli.max_payload)
         res.msg.truncate_msg(cli.max_payload);
+
+    res.msg.questions.front() = cli.cli_q;
 }
 
 void

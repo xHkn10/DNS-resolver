@@ -118,7 +118,5 @@ struct ClientContext {
     int id;
     u16 max_payload = 512;
     bool uses_edns = false;
-    bool wants_dnssec = false;
-    socklen_t addr_len;
-    sockaddr_in addr;
+    Question cli_q;
 };

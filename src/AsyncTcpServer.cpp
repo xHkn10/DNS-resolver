@@ -4,12 +4,17 @@
 #include "Message.hpp"
 #include "types.hpp"
 #include "util.hpp"
+#include "config.hpp"
 
 #include <boost/asio.hpp>
 #include <boost/asio/use_awaitable.hpp>
 #include <boost/asio/detached.hpp>
 #include <array>
 #include <vector>
+
+#ifndef DISABLE_STATISTICS
+#include "metrics.hpp"
+#endif
 
 namespace net = boost::asio;
 using net::ip::tcp;
@@ -67,7 +72,10 @@ AsyncTcpServer::rcv_dns_bytes(
 
 awaitable<void>
 AsyncTcpServer::handle_cli(tcp::socket sock) {
-
+    #ifndef DISABLE_STATISTICS
+    ScopedMeasure measure{Metric::cli_resolve_total_tcp};
+    #endif
+    
     try {
         while (true) {
             std::vector<u8> cli_query_bytes(4096);
@@ -99,7 +107,8 @@ AsyncTcpServer::handle_cli(tcp::socket sock) {
             }
         
             ClientContext cli_ctx{
-                .id = cli_query_msg->header.id
+                .id = cli_query_msg->header.id,
+                .cli_q = cli_query_msg->questions.front()
             };
             cli_query_msg->assign_edns_related_fields(cli_ctx);
         

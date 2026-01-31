@@ -86,6 +86,8 @@ Message::make_servfail(std::vector<u8>& bytes) {
 
 void
 Message::finalize_response(ResolverResult& res, const ClientContext& cli) {
+    res.msg.questions.front() = cli.cli_q;
+    
     res.msg.header.id = cli.id;
     res.msg.header.set_qr_bit();
     res.msg.header.set_rd_bit();
@@ -137,7 +139,6 @@ Message::assign_edns_related_fields(ClientContext& cli) const {
         return;
     cli.uses_edns = true;
     cli.max_payload = static_cast<u16>(opt->klass);
-    cli.wants_dnssec = static_cast<bool>(opt->ttl & 0x8000);
 }
 
 size_t
@@ -229,7 +230,7 @@ Message::from_cache_entry(
 
 std::optional<std::vector<u8>>
 Message::serialize() const {
-    std::vector<u8> packet(8192);
+    std::vector<u8> packet(INITIAL_PACKET_SZ);
     size_t cursor = 0;
     auto get_dn_len = [](std::span<const u8> dn) {
         size_t total_len = 0;
