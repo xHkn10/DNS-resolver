@@ -1,7 +1,7 @@
 #pragma once
 
 #include "types.hpp"
-#include <vector>
+#include <array>
 
 namespace dns::roots {
     #define ROOT_NAME(c) { \
@@ -26,5 +26,5 @@ namespace dns::roots {
 
     #undef ROOT_NAME
 
-    inline const std::vector<ResourceRecord> ALL{a, b, c, d, e, f, g, h, i, j, k, l, m};
+    inline const std::array ALL{a, b, c, d, e, f, g, h, i, j, k, l, m};
 }
