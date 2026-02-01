@@ -114,9 +114,17 @@ struct ResourceRecord {
     std::vector<u8> rdata;
 };
 
+enum class DnsMode : u8 {
+    UDP,
+    TCP,
+    DoT, // to be imp
+    DoH  // to be imp
+};
+
 struct ClientContext {
-    int id;
-    u16 max_payload = 512;
-    bool uses_edns = false;
     Question cli_q;
+    int id;
+    u16 max_payload = 0xFFFFU;
+    bool uses_edns = false;
+    DnsMode mode;
 };

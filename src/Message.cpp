@@ -106,8 +106,10 @@ Message::finalize_response(ResolverResult& res, const ClientContext& cli) {
             res.msg.put_edns_opt();
     }
 
-    if (res.msg.size() > cli.max_payload)
+    if (cli.mode == DnsMode::UDP && res.msg.size() > cli.max_payload) {
         res.msg.truncate_msg(cli.max_payload);
+        res.msg.header.set_tc_bit();
+    }
 }
 
 

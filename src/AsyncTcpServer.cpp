@@ -139,11 +139,12 @@ AsyncTcpServer::handle_cli(tcp::socket sock) {
         }
 
         ClientContext cli_ctx{
+            .cli_q = cli_query_msg->questions.front(),
             .id = cli_query_msg->header.id,
-            .cli_q = cli_query_msg->questions.front()
+            .mode = DnsMode::TCP
         };
         cli_query_msg->assign_edns_related_fields(cli_ctx);
-    
+
         Message::finalize_response(res, cli_ctx);
         auto response_bytes = res.msg.serialize();
 

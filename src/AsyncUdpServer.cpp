@@ -81,8 +81,9 @@ AsyncUdpServer::handle_cli(
     }
 
     ClientContext cli_ctx{
+        .cli_q = cli_query_msg->questions.front(),
         .id = cli_query_msg->header.id,
-        .cli_q = cli_query_msg->questions.front()
+        .mode = DnsMode::UDP
     };
     cli_query_msg->assign_edns_related_fields(cli_ctx);
 
