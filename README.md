@@ -8,7 +8,7 @@
   - DNS over UDP
   - DNS over TCP
   - DNS over TLS  
-  (DoH in development)
+  - DoH in development
 - Server queries nameservers using DNS over UDP, with TCP fallback on truncation
 
 ## Build
