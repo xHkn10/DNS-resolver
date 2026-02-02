@@ -15,6 +15,8 @@ enum class Metric : size_t {
     await_rcv,
     cli_resolve_total_udp,
     cli_resolve_total_tcp,
+    cli_resolve_total_https,
+    cli_resolve_total_tls,
     COUNT
 };
 

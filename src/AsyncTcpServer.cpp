@@ -9,7 +9,6 @@
 #include <boost/asio.hpp>
 #include <boost/asio/use_awaitable.hpp>
 #include <boost/asio/detached.hpp>
-#include <array>
 #include <sys/socket.h>
 #include <vector>
 
@@ -52,15 +51,11 @@ AsyncTcpServer::send_dns_bytes(
     tcp::socket& sock,
     const std::vector<u8>& bytes
 ) {
-    size_t sz = bytes.size();
-    std::array<u8, 2> dns_len_buf = {
-        static_cast<u8>(sz >> 8), static_cast<u8>(sz & 0xFF)
-    };
-
+    size_t len = htons(bytes.size());
     boost::system::error_code ec;
 
     co_await net::async_write(
-        sock, net::buffer(dns_len_buf),
+        sock, net::buffer(&len, 2),
         net::redirect_error(use_awaitable, ec)
     );
     co_await net::async_write(
@@ -75,19 +70,18 @@ AsyncTcpServer::rcv_dns_bytes(
     std::vector<u8>& buf
 ) {
 
-    std::array<u8, 2> dns_len_buf;
-
+    u16 len;
     {
         boost::system::error_code ec;
         co_await net::async_read(
-            sock, net::buffer(dns_len_buf),
+            sock, net::buffer(&len, 2),
             net::redirect_error(use_awaitable, ec)
         );
+        ntohs(len);
         if (ec)
             co_return 0;
     }
 
-    size_t len = (dns_len_buf[0] << 8) | dns_len_buf[1];
     buf.resize(len);
     
     {
@@ -155,9 +149,11 @@ AsyncTcpServer::handle_cli(tcp::socket sock) {
     }
 
     shutdown:
-    boost::system::error_code ec;
-    ec = sock.shutdown(tcp::socket::shutdown_send, ec);
-    sock.close();
+    {
+        boost::system::error_code ec;
+        ec = sock.shutdown(tcp::socket::shutdown_both, ec);
+        sock.close();        
+    }
 
     LOG("Connection shutdown\n");
 }

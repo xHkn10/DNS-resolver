@@ -1,4 +1,6 @@
+#include "AsyncHttpsServer.hpp"
 #include "AsyncTcpServer.hpp"
+#include "AsyncTlsServer.hpp"
 #include "AsyncUdpServer.hpp"
 #include "ResolverCore.hpp"
 #include "config.hpp"
@@ -16,11 +18,17 @@ int main() {
     });
 
     ResolverCore core{};
-    AsyncUdpServer udp_r{core};
-    AsyncTcpServer tcp_r{core};
+    AsyncUdpServer udp{core};
+    AsyncTcpServer tcp{core};
+    AsyncHttpsServer https{core};
+    AsyncTlsServer tls{core};
     
-    net::co_spawn(io, udp_r.listen(PORT), net::detached);
-    net::co_spawn(io, tcp_r.listen(PORT), net::detached);
-    std::cout << "Listening on port " << PORT << std::endl;
+    net::co_spawn(io, udp.listen(UDP_PORT), net::detached);
+    net::co_spawn(io, tcp.listen(TCP_PORT), net::detached);
+    net::co_spawn(io, https.listen(HTTPS_PORT), net::detached);
+    net::co_spawn(io, tls.listen(TLS_PORT), net::detached);
+
+    std::cout << "Listening...\n";
+    
     io.run();
 }
