@@ -21,5 +21,8 @@
 ### Compile
 - ./comp.zsh
 
+### Generate Certificate And Private Key
+- ./create_crt_key.zsh
+
 ### Stress test
 - ./dig_test.zsh
