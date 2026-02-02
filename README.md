@@ -1,17 +1,25 @@
-# Async Recursive DNS resolver
+# Async Recursive DNS Resolver
 
-### Features
-Async IO with Boost Asio coroutines \n
-DNS message parsing and serialization \n
-Recursive Resolution (root -> TLD -> authoritative) \n
-Client can query with DNS over UDP, over TCP or with TLS. (DoH in development) \n
-Server uses DNS over UDP to query nameservers, fallback to TCP if truncated \n
+## Features
+- Async I/O with Boost.Asio coroutines
+- DNS message parsing and serialization
+- Recursive resolution (root → TLD → authoritative)
+- Client queries supported over:
+  - DNS over UDP
+  - DNS over TCP
+  - DNS over TLS  
+  (DoH in development)
+- Server queries nameservers using DNS over UDP, with TCP fallback on truncation
 
-### Build
-Requirements: \n
-C++20 \n
-Boost \n
-OpenSSL \n
+## Build
 
-Compile with ./comp.zsh \n
-Stress test with ./dig_test.zsh \n
+### Requirements
+- C++20
+- Boost
+- OpenSSL
+
+### Compile
+- ./comp.zsh
+
+### Stress test
+- ./dig_test.zsh
