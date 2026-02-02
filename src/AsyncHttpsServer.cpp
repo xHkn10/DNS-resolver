@@ -27,37 +27,22 @@ using net::ip::tcp;
 using net::awaitable;
 using net::use_awaitable;
 
-AsyncHttpsServer::AsyncHttpsServer(ResolverCore& core) : resolver{core} {}
+AsyncHttpsServer::AsyncHttpsServer(ResolverCore& core) : resolver{core} {
+    ctx_.use_certificate_chain_file("server.crt");
+    ctx_.use_private_key_file("server.key", ssl::context::pem);
+}
 
 awaitable<void>
 AsyncHttpsServer::listen(const u16 port) {
+
     auto executor = co_await net::this_coro::executor;
     tcp::acceptor acceptor{executor, {tcp::v4(), port}};
-
-    ssl::context ctx{ssl::context::tlsv12_server};
-    ctx.use_certificate_chain_file("server.crt");
-    ctx.use_private_key_file("server.key", ssl::context::pem);
-
-    SSL_CTX* ssl_ctx = ctx.native_handle();
-
-    SSL_CTX_set_alpn_select_cb(ssl_ctx, [](SSL* ssl, const unsigned char** out, 
-                                        unsigned char* outlen, const unsigned char* in, 
-                                        unsigned int inlen, void* arg) -> int {
-        unsigned char next_proto[] = "\x02h2\x08http/1.1";
-        
-        if (SSL_select_next_proto(const_cast<unsigned char**>(out), outlen, 
-                                next_proto, sizeof(next_proto) - 1, 
-                                in, inlen) != OPENSSL_NPN_NEGOTIATED) {
-            return SSL_TLSEXT_ERR_NOACK;
-        }
-        return SSL_TLSEXT_ERR_OK;
-    }, nullptr);
 
     while (true) {
         tcp::endpoint cli;
 
         tcp::socket sock = co_await acceptor.async_accept(use_awaitable);
-        ssl::stream<tcp::socket> stream{std::move(sock), ctx};
+        ssl::stream<tcp::socket> stream{std::move(sock), ctx_};
 
         net::co_spawn(
             executor,
@@ -72,10 +57,11 @@ AsyncHttpsServer::handle_cli(ssl::stream<tcp::socket> ssl_stream) {
     #ifndef DISABLE_STATISTICS
     ScopedMeasure measure{Metric::cli_resolve_total_https};
     #endif
-    
+
     co_await ssl_stream.async_handshake(
         ssl::stream_base::server, use_awaitable
     );
+
     beast::flat_buffer buffer(4096);
 
     http::request<http::vector_body<u8>> req;
@@ -117,12 +103,6 @@ AsyncHttpsServer::handle_cli(ssl::stream<tcp::socket> ssl_stream) {
 
         if (!response_bytes)
             goto shutdown;
-
-        http::response<http::vector_body<u8>>
-        response = AsyncHttpsServer::prepare_http_response(std::move(req.body()));
-        co_await http::async_write(
-                ssl_stream, response, use_awaitable
-            );
     }
 
     send_response:
@@ -135,10 +115,12 @@ AsyncHttpsServer::handle_cli(ssl::stream<tcp::socket> ssl_stream) {
     }
 
     shutdown:
-    boost::system::error_code ec;
-    co_await ssl_stream.async_shutdown(net::redirect_error(use_awaitable, ec));
-    ec = ssl_stream.lowest_layer().shutdown(tcp::socket::shutdown_send, ec);
-    ssl_stream.lowest_layer().close();
+    {
+        boost::system::error_code ec;
+        co_await ssl_stream.async_shutdown(net::redirect_error(use_awaitable, ec));
+        ec = ssl_stream.lowest_layer().shutdown(tcp::socket::shutdown_send, ec);
+        ssl_stream.lowest_layer().close();
+    }
     
     LOG("Connection shutdown\n");
 }

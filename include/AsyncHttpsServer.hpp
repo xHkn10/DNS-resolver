@@ -23,6 +23,7 @@ class ResolverCore;
 class AsyncHttpsServer {
 private:
     ResolverCore& resolver;
+    ssl::context ctx_{ssl::context::tlsv12_server};
 
 public:
     AsyncHttpsServer(ResolverCore& core);
