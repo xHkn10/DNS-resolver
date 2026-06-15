@@ -21,15 +21,14 @@ using net::use_awaitable;
 class ResolverCore;
 
 class AsyncHttpsServer {
-private:
     ResolverCore& resolver;
     ssl::context ctx_{ssl::context::tlsv12_server};
 
 public:
-    AsyncHttpsServer(ResolverCore& core);
+    explicit AsyncHttpsServer(ResolverCore& core);
 
     awaitable<void>
-    listen(const u16 port);
+    listen(u16 port);
     
 private:
     awaitable<void>

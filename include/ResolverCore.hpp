@@ -15,7 +15,6 @@ using net::awaitable;
 using net::use_awaitable;
 
 class ResolverCore {
-private:
     Cache cache;
 
 public:

@@ -14,7 +14,7 @@ struct ResolverResult {
     ResolverStatus status;
     RCode code;
     Message msg;
-    explicit operator bool() {
+    explicit operator bool() const {
         return status == ResolverStatus::Success;
     }
 };

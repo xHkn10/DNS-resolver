@@ -14,14 +14,13 @@ using net::use_awaitable;
 class ResolverCore;
 
 class AsyncTcpServer {
-private:
     ResolverCore& resolver;
 
 public:
-    AsyncTcpServer(ResolverCore& core);
+    explicit AsyncTcpServer(ResolverCore& core);
 
     awaitable<void>
-    listen(const u16 port);
+    listen(u16 port);
 
     static awaitable<void>
     send_dns_bytes(tcp::socket& sock, const std::vector<u8>& bytes);

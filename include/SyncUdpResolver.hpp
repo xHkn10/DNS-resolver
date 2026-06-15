@@ -16,7 +16,6 @@ public:
     const int max_iterations = 30;
     Cache cache;
 
-public:
     SyncUdpResolver(u16 port, size_t max_buffer_sz);
     SyncUdpResolver() = default;
     bool init();

@@ -60,8 +60,8 @@ namespace util {
     inline void pp_bytes(const std::vector<u8>& bytes) {
         pretty_print_bytes(bytes);
     }
-    
-    inline std::string dn_to_str(const auto& dn) {
+
+    std::string dn_to_str(const auto& dn) {
         std::string res;
         for (i32 i{0}; ; ) {
             u8 label_len = dn[i++];
@@ -109,7 +109,7 @@ namespace util {
     }
 
     template <typename T>
-    inline void shuffle(std::vector<T>& v) {
+    void shuffle(std::vector<T>& v) {
         std::shuffle(v.begin(), v.end(), seed());
     }
 }

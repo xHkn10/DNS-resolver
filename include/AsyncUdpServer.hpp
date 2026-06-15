@@ -14,7 +14,6 @@ using net::awaitable;
 using net::use_awaitable;
 
 class AsyncUdpServer {
-private:
     ResolverCore& resolver;
 
 public:

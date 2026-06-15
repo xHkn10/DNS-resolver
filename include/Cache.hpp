@@ -20,13 +20,14 @@ struct CacheKey {
     std::vector<u8> name;
     RRType rrtype;
     DNSClass rrclass;
-    inline bool operator==(const CacheKey& o) const {
+
+    bool operator==(const CacheKey& o) const {
         return name == o.name && rrtype == o.rrtype && rrclass == o.rrclass;
     }
 };
 
 struct CacheKeyHash {
-    inline size_t operator()(const CacheKey& k) const {
+    size_t operator()(const CacheKey& k) const {
         size_t h =
         std::hash<int>{}(static_cast<int>(k.rrtype))
         ^
@@ -40,7 +41,6 @@ struct CacheKeyHash {
 };
 
 class Cache {
-private:
     std::unordered_map<CacheKey, CacheEntry, CacheKeyHash> cache_;
 
 public:
