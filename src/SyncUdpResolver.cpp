@@ -79,8 +79,8 @@ SyncUdpResolver::listen() {
         }
 
         ClientContext cli_ctx{
-            .id = cli_query->header.id,
-            .cli_q = cli_query->questions.front()
+            .cli_q = cli_query->questions.front(),
+            .id = cli_query->header.id
         };
         cli_query->assign_edns_related_fields(cli_ctx);
         
