@@ -93,7 +93,7 @@ struct Header {
     inline void clear_tc_bit() {flags &= ~MASK_TC;}
     inline void clear_rd_bit() {flags &= ~MASK_RD;}
     inline void clear_ra_bit() {flags &= ~MASK_RA;}
-} __attribute__((packed));
+};
 
 static_assert(
     Header::HEADER_SZ == sizeof(Header),
