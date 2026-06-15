@@ -4,6 +4,7 @@
 #include "util.hpp"
 #include "roots.hpp"
 
+#include <cstring>
 #include <chrono>
 #include <concepts>
 #include <optional>
