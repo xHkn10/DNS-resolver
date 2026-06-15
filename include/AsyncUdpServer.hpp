@@ -21,7 +21,7 @@ public:
     AsyncUdpServer(ResolverCore& core);
 
     awaitable<void>
-    listen(const u16 port);
+    listen(u16 port);
 
 private:
     awaitable<void>

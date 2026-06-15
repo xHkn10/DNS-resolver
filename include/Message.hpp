@@ -63,7 +63,7 @@ private:
     bool deserialize_question_(const std::vector<u8>& packet, size_t& cursor);
     bool deserialize_rr_(
         std::vector<ResourceRecord>& v,
-        const std::vector<u8> packet,
+        std::vector<u8> packet,
         size_t& cursor
     );
     bool deserialize_dn_(

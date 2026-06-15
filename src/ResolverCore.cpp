@@ -33,7 +33,7 @@ ResolverCore::query_in_udp(
     udp::socket server_sock{executor, udp::v4()};
     udp::endpoint target_endpoint{addr, 53};
     
-    LOG("Queried " << util::dn_to_str(rr.name) << '\n');
+    LOG("Queried " << util::dn_to_str(rr.name));
 
     co_await server_sock.async_send_to(
         net::buffer(query_bytes), target_endpoint, use_awaitable
@@ -64,7 +64,7 @@ ResolverCore::query_in_tcp(
     co_await server_sock.async_connect(target_endpoint, use_awaitable);
     co_await AsyncTcpServer::send_dns_bytes(server_sock, query_bytes);
 
-    LOG("Queried " << util::dn_to_str(rr.name) << '\n');
+    LOG("Queried " << util::dn_to_str(rr.name));
     
     co_return 
         co_await AsyncTcpServer::rcv_dns_bytes(
@@ -177,16 +177,15 @@ ResolverCore::resolve(
 
         CacheEntry best_nss = cache.find_best_ns_rrset(q.qname);
 
-        LOG("BEST NSS:\n" << util::dn_to_str(best_nss.rrset.front().rdata) << '\n');
+        LOG("BEST NSS: " << util::dn_to_str(best_nss.rrset.front().rdata));
 
         util::shuffle(best_nss.rrset);
 
         std::vector<ResourceRecord> a_records;
-        for (const ResourceRecord& ns : best_nss.rrset) {
-            auto entry = cache.get(ns.rdata, RRType::A, DNSClass::IN);
-            if (entry)
+        for (const ResourceRecord& ns : best_nss.rrset)
+            if (auto entry = cache.get(ns.rdata, RRType::A, DNSClass::IN))
                 a_records.insert(a_records.end(), entry->rrset.begin(), entry->rrset.end());
-        }
+
         util::shuffle(a_records);
 
         for (const ResourceRecord& rr : a_records) {
@@ -201,12 +200,12 @@ ResolverCore::resolve(
                 continue;
 
             if (rcvd_msg->header.is_tc()) {
-                LOG("Switching to TCP\n");
+                LOG("Switching to TCP");
 
                 response.resize(4096);
                 n = co_await query_in_tcp(rr, *query_bytes, response);
                 
-                LOG("Received " << n << " bytes from " << util::dn_to_str(rr.name) << '\n');
+                LOG("Received " << n << " bytes from " << util::dn_to_str(rr.name));
 
                 rcvd_msg = parse_and_validate_response(response, query_msg.header.id);
                 if (!rcvd_msg)
@@ -223,7 +222,7 @@ ResolverCore::resolve(
                 };
 
             if (!rcvd_msg->has_glue()) {
-                LOG("No glue records\n");
+                LOG("No glue records");
                 
                 for (const ResourceRecord& ns : rcvd_msg->authorities) {
                     if (ns.type != RRType::NS)

@@ -1,6 +1,6 @@
 #!/bin/zsh
 
-clang++ src/*.cpp -I include -I bench -I /opt/homebrew/opt/boost/include -Wall -std=c++20 -o dns_server -O3
+# clang++ src/*.cpp -I include -I bench -I /opt/homebrew/opt/boost/include -Wall -std=c++20 -o dns_server -O3
 echo "compiled"
 ./dns_server &
 METRICS_PID=$!

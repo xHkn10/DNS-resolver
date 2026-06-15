@@ -15,6 +15,7 @@ Cache::Cache() {
         put_positive({rr.name, rr.type, rr.klass}, {rr});
 
     std::vector<ResourceRecord> root_ns_rrset;
+    root_ns_rrset.reserve(dns::roots::ALL.size());
     for (const ResourceRecord& rr : dns::roots::ALL)
         root_ns_rrset.emplace_back(std::vector<u8>{1, '.', 0}, RRType::NS, DNSClass::IN, rr.ttl, rr.name.size(), rr.name);
 
@@ -54,9 +55,7 @@ template std::optional<CacheEntry>
 Cache::get<RRType>(std::span<const u8>, RRType, DNSClass);
 
 template <typename T>
-requires
-std::same_as<std::remove_cvref_t<T>, RRType>
-|| std::same_as<std::remove_cvref_t<T>, QType>
+requires std::same_as<std::remove_cvref_t<T>, RRType> || std::same_as<std::remove_cvref_t<T>, QType>
 std::optional<CacheEntry>
 Cache::get(std::span<const u8> name, T type, DNSClass klass) {
     std::vector<u8> norm = util::normalize(name);
